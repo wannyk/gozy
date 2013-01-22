@@ -1,0 +1,15 @@
+{
+  "name": "gozy",
+  "version": "0.0.0",
+  "description": "go crazy",
+  "main": "gozy.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/newmsz/gozy.git"
+  },
+  "author": "newms",
+  "license": "MIT"
+}
