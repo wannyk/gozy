@@ -4,11 +4,12 @@ var _ = require('underscore'),
 	fs = require('fs'),
 	mime = require('mime'),
 	EventEmitter = require('events').EventEmitter,
-	utilities = require('./utilities');
+	utilities = require('./utilities'),
+	BackboneModelGenerator = require('./BackboneModelGenerator');
 
 var ACCEPT_URL = 'accept-url',
 	ACCEPT_METHOD = 'accept-method',
-	TEMPLATE = 'template', CONTENT = 'content', 
+	TEMPLATE = 'template', CONTENT = 'content', BACKBONE = 'backbone', 
 	DEFAULT_TEMPLATE = 'default_template', DEFAULT_LOCALE = 'default_locale',
 	MIME = 'mime';
 
@@ -40,6 +41,9 @@ exports.control = function (request, response) {
 						.appendHeader('accept_charset', ['UTF-8'].join(','))
 						.commit();
 		}
+	} else if(request.isBackboneRequest()) {
+		request._headers.accept = 'text/javascript';
+		accept = ['text/javascript'];
 	}
 	
 	var match = null, llen = 0, mna = [], emit_any = false;
@@ -128,11 +132,18 @@ exports.View = function (obj, options) {
 		});
 	}
 	
-	if(options && options[TEMPLATE])
-		templateEnabledView(obj, options);
-	if(options && options[CONTENT])
-		contentEnabledView(obj, options);
-		
+	if(options && options[BACKBONE]) {
+		if(options && options[TEMPLATE])
+			throw new Error('Template view cannot be Backbone Model provider');
+		if(options && options[CONTENT])
+			contentEnabledView(obj, options, true);
+	} else {
+		if(options && options[TEMPLATE])
+			templateEnabledView(obj, options);
+		if(options && options[CONTENT])
+			contentEnabledView(obj, options, false);
+	}
+	
 	view_map[accept_url.toString()][accept_method] = obj;
 	view_urls.push(accept_url);
 	
@@ -148,13 +159,14 @@ function templateEnabledView(view, options) {
 	var parseTemplateObject = function (template_name, locale, filename) {
 		if(!view._render_target) view._render_target = { }; 
 		if(!view._render_target[template_name]) view._render_target[template_name] = { };
+		if(!view._render_target_mime) view._render_target_mime = { }; 
 		
 		if(!fs.existsSync(filename)) {
 			global.gozy.error('View template "' + fs.realpathSync(filename) + '" is not found');
 			return false;
 		} 
 		
-		view._mime = mime.lookup(filename);
+		view._render_target_mime[template_name] = mime.lookup(filename);
 		
 		switch(view._mime) {
 		case 'application/json':
@@ -180,16 +192,16 @@ function templateEnabledView(view, options) {
 	if(typeof options[TEMPLATE] === 'string') {
 		default_template = default_template || 'default_1';
 		default_locale = default_locale || 'en-us';
-		
+	
 		if(!parseTemplateObject(default_template, default_locale, options[TEMPLATE]))
 			return;
 	} else if (typeof options[TEMPLATE] === 'object') {
 		for(var template in options[TEMPLATE]) {
 			if(typeof options[TEMPLATE][template] === 'string') {
-				default_template = default_template || template;
-				default_locale = default_locale || 'en-us';
-				
-				if(!parseTemplateObject(template, default_locale, options[TEMPLATE][template]))
+				default_template = default_template || 'default_1';
+				default_locale = default_locale || template; /* in this case template means locale */
+		
+				if(!parseTemplateObject(default_template, default_locale, options[TEMPLATE][template]))
 					return;
 				break;
 			}
@@ -208,16 +220,18 @@ function templateEnabledView(view, options) {
 	view._default_template = default_template;
 	view._default_locale = default_locale;
 	view._content_func = _content_func;
+	view._mime_func = _mime_func;
 	/*view.updateTemplate = _updateTemplate;*/
 }
 
-function contentEnabledView(view, options) {
+function contentEnabledView(view, options, isBackbone) {
 	var parseContentObject = function (template_name, locale, mime, func) {
 		if(!view._render_target) view._render_target = { }; 
 		if(!view._render_target[template_name]) view._render_target[template_name] = { };
+		if(!view._render_target_mime) view._render_target_mime = { }; 
 				
-		view._mime = mime || 'binary/octet-stream';
 		view._render_target[template_name][locale] = func;
+		view._render_target_mime[template_name] = mime || 'binary/octet-stream';
 		view._isString = false;
 		view._isTemplate = false;
 		
@@ -233,8 +247,20 @@ function contentEnabledView(view, options) {
 		
 		if(typeof options[MIME] !== 'string') throw new Error('MIME is not set or not a string');
 		
-		if(!parseContentObject(default_template, default_locale, options[MIME], options[CONTENT]))
-			return;
+		if(isBackbone) {
+			if(!parseContentObject(default_template, default_locale, options[MIME], options[CONTENT]))
+				return;
+				
+			parseContentObject(BACKBONE, default_locale, 'text/javascript', 
+					BackboneModelGenerator.generateContentFunction(
+							options[ACCEPT_URL], options[ACCEPT_METHOD], options[BACKBONE]
+					));
+			
+			view.on('text/javascript', function (request, response) { return response.OK().render(BACKBONE).commit(); });							
+		} else {
+			if(!parseContentObject(default_template, default_locale, options[MIME], options[CONTENT]))
+				return;
+		}
 	} else if (typeof options[CONTENT] === 'object') {
 		for(var content in options[CONTENT]) {
 			if(typeof options[CONTENT][content] === 'function') {
@@ -267,6 +293,7 @@ function contentEnabledView(view, options) {
 	view._default_template = default_template;
 	view._default_locale = default_locale;
 	view._content_func = _content_func;
+	view._mime_func = _mime_func;
 	/*view.updateTemplate = _updateTemplate;*/
 }
 
@@ -278,6 +305,10 @@ function contentEnabledView(view, options) {
 	for(var i=0; i<template_languages.length; i++)
 		this._render_target[template_languages[i]] = _.template(this._render_target[template_languages[i]], obj); 
 }*/
+
+function _mime_func (template) {
+	return this._render_target_mime[template || this._default_template];
+}
 
 function _content_func (template, locale_arr) {
 	var template_name = template || this._default_template;

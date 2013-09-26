@@ -6,7 +6,8 @@ var url = require('url'),
 	formidable = require('formidable');
 
 var print_request = false;
-var AUTHORIZATION = 'authorization', 
+var ISBACKBONE = '_backbone_',
+	AUTHORIZATION = 'authorization', 
 	ACCEPT = 'accept',
 	ACCEPT_LANGUAGE = 'accept-language',
 	USER_AGENT = 'user-agent',
@@ -303,6 +304,10 @@ HttpRequest.prototype.isModified = function (etag, last_modified) {
 	}
 	
 	return false;
+};
+
+HttpRequest.prototype.isBackboneRequest = function () {
+	return (this.query(ISBACKBONE) === 'true'); 
 };
 
 HttpRequest.prototype._rewriteRequest = function (_method, _url) {

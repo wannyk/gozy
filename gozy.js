@@ -48,6 +48,7 @@ Gozy.prototype.onRequest = function (request, response) {
 			if(renderer.interceptResourceRequest(http_req, http_res)) return;
 			
 			http_res.setLocale(http_req.locale());
+			
 			view.control(http_req, http_res);	
 		});			
 	});	

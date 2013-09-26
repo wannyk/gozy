@@ -23,12 +23,12 @@ Renderer.prototype.render = function (name, args) {
 	
 	var target_view = this._target_view;
 	
-	if(!target_view._content_func) {
+	if(!target_view._content_func || !target_view._mime_func) {
 		this.error('template ' + (name ? '"' + name + '" ' : '') + 'is not defined in ' + target_view._filename);
 		return this;
 	}
 	
-	var mime = target_view._mime,
+	var mime = target_view._mime_func(name),
 		content = target_view._content_func(name, this._response_locale);
 		
 	if(target_view._isTemplate && target_view._isString) {
