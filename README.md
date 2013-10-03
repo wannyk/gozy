@@ -209,7 +209,7 @@ function content(args) {
 
 Content View with Backbone Model provider
 =========================================
-'''
+```
 require('gozy').View(this, {
 	'accept-url': /^\/path$/, 
 	'accept-method': 'GET',
@@ -227,12 +227,12 @@ require('gozy').View(this, {
 function content(args) {
 	return JSON.stringify(args);
 }
-'''
+```
 
 Content View with Backbone Collection provider
 ==============================================
 Note, you can override Backbone Collection's parse function
-'''
+```
 require('gozy').View(this, {
 	'accept-url': /^\/path$/, 
 	'accept-method': 'GET',
@@ -254,11 +254,11 @@ require('gozy').View(this, {
 function content(args) {
 	return JSON.stringify(args);
 }
-'''
+```
 
 Usage of Gozy RMI through Backbone Collection
 =============================================
-'''
+```
 require('gozy').View(this, {
 	'accept-url': /^\/path\/f$/, 
 	'accept-method': 'GET',
@@ -287,7 +287,7 @@ this.on('rmi_test', function (request, response) {
 function content(args) {
 	return JSON.stringify(args);
 }
-'''
+```
 License
 =======
 MIT License
