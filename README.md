@@ -206,6 +206,88 @@ function content(args) {
 	return JSON.stringify(args);
 }
 ```
+
+Content View with Backbone Model provider
+=========================================
+'''
+require('gozy').View(this, {
+	'accept-url': /^\/path$/, 
+	'accept-method': 'GET',
+	'content': content,
+	'mime': 'application/json',
+	'backbone': {
+		Type: 'model',
+		RequireJS: true,
+		ModelOptions: {
+			idAttribute: 'id'
+		}
+	}
+});
+
+function content(args) {
+	return JSON.stringify(args);
+}
+'''
+
+Content View with Backbone Collection provider
+==============================================
+Note, you can override Backbone Collection's parse function
+'''
+require('gozy').View(this, {
+	'accept-url': /^\/path$/, 
+	'accept-method': 'GET',
+	'content': content,
+	'mime': 'application/json',
+	'backbone': {
+		parse: function (response) {
+			this.next_search_url = response.next_search_url;
+			return response.data;
+		},
+		Type: 'collection',
+		RequireJS: true,
+		ModelOptions: {
+			idAttribute: 'id'
+		}
+	}
+});
+
+function content(args) {
+	return JSON.stringify(args);
+}
+'''
+
+Usage of Gozy RMI through Backbone Collection
+=============================================
+'''
+require('gozy').View(this, {
+	'accept-url': /^\/path\/f$/, 
+	'accept-method': 'GET',
+	'content': content,
+	'mime': 'application/json',
+	'backbone': {
+		Type: 'collection',
+		RequireJS: true,
+		ModelOptions: {
+			idAttribute: 'id'
+		},
+		CollectionOptions: {
+			parse: function (response) {
+				this.NextSearchUrl = response.next_search_url;
+				return response.data;
+			},
+			AcceptRMI: ['rmi_test']
+		}
+	}
+});
+
+this.on('rmi_test', function (request, response) {
+	return response('My Request is successfully completed');
+});
+
+function content(args) {
+	return JSON.stringify(args);
+}
+'''
 License
 =======
 MIT License
