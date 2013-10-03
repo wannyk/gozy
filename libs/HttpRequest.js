@@ -6,7 +6,7 @@ var url = require('url'),
 	formidable = require('formidable');
 
 var print_request = false;
-var ISBACKBONE = '_backbone_',
+var BACKBONE = 'backbone', BACKBONE_MODEL = 'model', BACKBONE_COLLECTION = 'collection',
 	AUTHORIZATION = 'authorization', 
 	ACCEPT = 'accept',
 	ACCEPT_LANGUAGE = 'accept-language',
@@ -307,7 +307,7 @@ HttpRequest.prototype.isModified = function (etag, last_modified) {
 };
 
 HttpRequest.prototype.isBackboneRequest = function () {
-	return (this.query(ISBACKBONE) === 'true'); 
+	return (this.query(BACKBONE) === BACKBONE_MODEL ? BACKBONE_MODEL : this.query(BACKBONE) === BACKBONE_COLLECTION ? BACKBONE_COLLECTION : null); 
 };
 
 HttpRequest.prototype._rewriteRequest = function (_method, _url) {

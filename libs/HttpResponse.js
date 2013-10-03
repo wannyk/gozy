@@ -34,8 +34,6 @@ var HTTP_STATUS = exports.HTTP_STATUS = [
 		{"code": 505, "name": "HTTP Version not supported", "headers_required": [], "function_required": [''] },
 ];
 
-var ISBACKBONE = '_backbone_';
-
 var print_response = false;
 
 exports.printResponse = function (print) {
@@ -76,11 +74,6 @@ function generateHttpResponse(status) {
 
 HttpResponse.prototype.setStatus = function (status) {
 	this._status = status;
-	return this;
-};
-
-HttpResponse.prototype.setBackboneResponse = function (isBackboneRequest) {
-	this[ISBACKBONE] = isBackboneRequest;
 	return this;
 };
 

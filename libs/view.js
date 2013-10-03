@@ -5,11 +5,12 @@ var _ = require('underscore'),
 	mime = require('mime'),
 	EventEmitter = require('events').EventEmitter,
 	utilities = require('./utilities'),
-	BackboneModelGenerator = require('./BackboneModelGenerator');
+	BackboneGenerator = require('./BackboneGenerator');
 
 var ACCEPT_URL = 'accept-url',
 	ACCEPT_METHOD = 'accept-method',
-	TEMPLATE = 'template', CONTENT = 'content', BACKBONE = 'backbone', 
+	TEMPLATE = 'template', CONTENT = 'content', 
+	BACKBONE = 'backbone', BACKBONE_MODEL = 'model', BACKBONE_COLLECTION = 'collection', 
 	DEFAULT_TEMPLATE = 'default_template', DEFAULT_LOCALE = 'default_locale',
 	MIME = 'mime';
 
@@ -45,6 +46,8 @@ exports.control = function (request, response) {
 		request._headers.accept = 'text/javascript';
 		accept = ['text/javascript'];
 	}
+	
+	console.log(request);
 	
 	var match = null, llen = 0, mna = [], emit_any = false;
 	
@@ -95,8 +98,9 @@ exports.control = function (request, response) {
 		
 		var event = match._events[events[i]];
 		if(typeof event === 'function' || (Array.isArray(event) && event.length > 0)) {
-			if(emit_any) // Client requests '*/*' but no controllers found
+			if(emit_any && events[i] !== match._backbone_prevention) // Client requests '*/*' but no controllers found
 				return emit(events[i], match);
+
 			acceptable.push(events[i]);
 		}
 	}
@@ -133,10 +137,13 @@ exports.View = function (obj, options) {
 	}
 	
 	if(options && options[BACKBONE]) {
+		if(!options[BACKBONE].Type) throw new Error('Backbone must be set "Type" property as either "model" or "collection"');
+		if(options[BACKBONE].Type !== BACKBONE_COLLECTION && options[BACKBONE].Type !== BACKBONE_MODEL) throw new Error('Backbone must be set "Type" property as either "' + BACKBONE_MODEL + '" or "' + BACKBONE_COLLECTION + '"');
+		
 		if(options && options[TEMPLATE])
 			throw new Error('Template view cannot be Backbone Model provider');
 		if(options && options[CONTENT])
-			contentEnabledView(obj, options, true);
+			contentEnabledView(obj, options, options[BACKBONE].Type);
 	} else {
 		if(options && options[TEMPLATE])
 			templateEnabledView(obj, options);
@@ -168,7 +175,7 @@ function templateEnabledView(view, options) {
 		
 		view._render_target_mime[template_name] = mime.lookup(filename);
 		
-		switch(view._mime) {
+		switch(view._render_target_mime[template_name]) {
 		case 'application/json':
 		case 'text/html':
 		case 'text/css':
@@ -250,11 +257,18 @@ function contentEnabledView(view, options, isBackbone) {
 		if(isBackbone) {
 			if(!parseContentObject(default_template, default_locale, options[MIME], options[CONTENT]))
 				return;
-				
-			parseContentObject(BACKBONE, default_locale, 'text/javascript', 
-					BackboneModelGenerator.generateContentFunction(
-							options[ACCEPT_URL], options[ACCEPT_METHOD], options[BACKBONE]
-					));
+			view._backbone_prevention = 'text/javascript';
+			if(isBackbone === BACKBONE_MODEL) {
+				parseContentObject(BACKBONE, default_locale, 'text/javascript', 
+						BackboneGenerator.generateModelContentFunction(
+								options[ACCEPT_URL], options[ACCEPT_METHOD], options[BACKBONE]
+						));
+			} else {
+				parseContentObject(BACKBONE, default_locale, 'text/javascript', 
+						BackboneGenerator.generateCollectionContentFunction(
+								options[ACCEPT_URL], options[ACCEPT_METHOD], options[BACKBONE]
+						));
+			}
 			
 			view.on('text/javascript', function (request, response) { return response.OK().render(BACKBONE).commit(); });							
 		} else {
