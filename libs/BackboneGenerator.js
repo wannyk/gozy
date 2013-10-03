@@ -6,7 +6,9 @@ var /* GLOBAL CONSTANTS */
 	/* CONSTANTS FOR MODEL */
 	MODEL_OPTIONS = 'ModelOptions',
 	/* CONSTANTS FOR COLLECTION */ 
-	MODEL_URL = 'ModelUrl', COLLECTION_OPTIONS = 'CollectionOptions';
+	MODEL_URL = 'ModelUrl', 
+	COLLECTION_OPTIONS = 'CollectionOptions', PARSE_OVERRIDE = 'parse';
+	
 
 /* COLLECTION TEMPLATE */	 
 var RequireJSCollectionPrefix = [
@@ -106,9 +108,16 @@ exports.generateCollectionContentFunction = function (accept_url, accept_method,
 	console.log(options);
 	
 	var CollectionOptions = options[COLLECTION_OPTIONS];
+	
 	if(CollectionOptions) {
+		var _parse_func_overrided; 
+		if(CollectionOptions[PARSE_OVERRIDE]) _parse_func_overrided = CollectionOptions[PARSE_OVERRIDE] + '';
+		
 		CollectionOptions = JSON.stringify(options.CollectionOptions);
 		CollectionOptions = CollectionOptions.substring(1, CollectionOptions.length - 1);
+		
+		if(_parse_func_overrided) CollectionOptions += (CollectionOptions ? ', parse: ' : 'parse: ') + _parse_func_overrided;
+		
 	} else CollectionOptions = '';
 	
 	var ModelOptions = options[MODEL_OPTIONS];
