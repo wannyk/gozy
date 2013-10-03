@@ -49,7 +49,7 @@ gozy.bindModels('application/model/')
 
 View Usage
 ================
-'''
+```
 require('gozy').View(this, {
 	'accept-url': /^\/path\/to\/resource$/,
 	'accept-method': 'GET'
@@ -69,11 +69,11 @@ this.on('*/*', function (request, response, preq_args) {
 	else
 		return response.Forbidden().commit(); 
 });
-'''
+```
 
 MongoDB Model Usage
 ===================
-'''
+```
 require('gozy').Model(this, 'MyMongoDB', {
 	defaults: {
 		Name: null,
@@ -84,11 +84,11 @@ require('gozy').Model(this, 'MyMongoDB', {
 this.on('initialize', function (model) {
 	model.prototype.setName = setName;	
 });
-'''
+```
 
 MySQL Model Usage
 ===================
-'''
+```
 require('gozy').Model(this, 'MyMySQL', {
 	schema: {
 		id: { Id: true, type: 'INTEGER' },
@@ -101,12 +101,12 @@ require('gozy').Model(this, 'MyMySQL', {
 this.on('initialize', function (model) {
 	model.prototype.setName = setName;	
 });
-'''
+```
 
 Redis Model Usage
 ===================
 #### MyStringModel.js
-'''
+```
 require('gozy').Model(this, 'MyRedis', {
 	type: 'STRING',
 	defaults: {
@@ -127,10 +127,10 @@ exports.createNew = function (cb) {
 	});	
 };
 
-'''
+```
 
 #### MyHashModel.js
-'''
+```
 require('gozy').Model(this, 'MyRedis', {
 	type: 'HASH',
 	defaults: {
@@ -162,7 +162,7 @@ exports.findModel = function (key, cb) {
 	exports.hgetall(key, cb);
 };
 
-'''
+```
 #### Mailer Usage
 ```
 require('gozy').Mailer(this, 'MyMailer', {
