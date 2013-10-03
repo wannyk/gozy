@@ -7,6 +7,7 @@ var _ = require('underscore'),
 	utilities = require('./utilities'),
 	BackboneGenerator = require('./BackboneGenerator');
 
+var GOZY_RMI = BackboneGenerator.GOZY_RMI, GOZY_DGT = BackboneGenerator.GOZY_DGT;
 var ACCEPT_URL = 'accept-url',
 	ACCEPT_METHOD = 'accept-method',
 	TEMPLATE = 'template', CONTENT = 'content', 
@@ -47,7 +48,7 @@ exports.control = function (request, response) {
 		accept = ['text/javascript'];
 	}
 	
-	console.log(request);
+	if(request.header(GOZY_RMI) && request.header(GOZY_DGT) && request.method() === 'POST') return _control_rmi(request, response);
 	
 	var match = null, llen = 0, mna = [], emit_any = false;
 	
@@ -110,6 +111,61 @@ exports.control = function (request, response) {
 			
 	return response.NotAcceptable().appendHeader('accept', acceptable.join(',')).commit();
 };
+
+function _control_rmi (request, response) {
+	var path = request.pathname(),
+		method = request.header(GOZY_DGT),
+		rrmi = request.header(GOZY_RMI),
+		rmi = null;
+		
+	var match = null, llen = 0;
+	for(var i=0; i<view_urls.length; i++) {
+		if(view_urls[i].test(path)) {
+			var _urlstr = view_urls[i].toString(),
+				vm = view_map[_urlstr];
+			
+			if(vm[method]) { 
+				var url_len = _urlstr.split('\/').length;
+				if(url_len > llen) {
+					llen = url_len;
+					match = vm[method]; 
+				}
+			}
+		}
+	}
+	
+	if(!match) return response.NotFound().commit();
+
+	for(var i=0; i<match._backbone_rmi.length; i++) 
+		if(match._backbone_rmi[i] === rrmi) rmi = rrmi;
+	
+	if(!rmi) return response.NotFound().commit();
+	
+	for(var i=0; i<request._body.length; i++)
+		request[i] = request._body[i];
+	
+	var response_func = (function (_response) {
+		return function () {
+			var response_arr = [];
+			for(var i=0; i<arguments.length; i++) {
+				if(typeof arguments[i] === 'function') throw new Error('An argument for Gozy RMI Response cannot be a function: at ' + i);
+				response_arr.push(arguments[i]);
+			}
+			response.OK().json(response_arr).commit();
+		};
+	})(response);
+	 
+	response._target_view = match;
+		
+	if(match.listeners(rmi).length === 0) return response.NotFound().commit();
+	
+	if(match.listeners('prerequest').length > 0) {
+		return match.emit('prerequest', request, response, function (preq_args) {
+			return match.emit(rmi, request, response_func, preq_args);
+		});
+	} else
+		return match.emit(rmi, request, response_func);
+}
 
 exports.View = function (obj, options) {
 	/* Called by individual veiw scripts as 'require('gozy').View~' */
@@ -259,15 +315,15 @@ function contentEnabledView(view, options, isBackbone) {
 				return;
 			view._backbone_prevention = 'text/javascript';
 			if(isBackbone === BACKBONE_MODEL) {
-				parseContentObject(BACKBONE, default_locale, 'text/javascript', 
-						BackboneGenerator.generateModelContentFunction(
-								options[ACCEPT_URL], options[ACCEPT_METHOD], options[BACKBONE]
-						));
+				var _backbone = BackboneGenerator.generateModelContentFunction(
+						options[ACCEPT_URL], options[ACCEPT_METHOD], options[BACKBONE]);
+				view._backbone_rmi = _backbone.accept_rmi;
+				parseContentObject(BACKBONE, default_locale, 'text/javascript', _backbone.content_func);
 			} else {
-				parseContentObject(BACKBONE, default_locale, 'text/javascript', 
-						BackboneGenerator.generateCollectionContentFunction(
-								options[ACCEPT_URL], options[ACCEPT_METHOD], options[BACKBONE]
-						));
+				var _backbone = BackboneGenerator.generateCollectionContentFunction(
+					options[ACCEPT_URL], options[ACCEPT_METHOD], options[BACKBONE]);
+				view._backbone_rmi = _backbone.accept_rmi;
+				parseContentObject(BACKBONE, default_locale, 'text/javascript', _backbone.content_func);
 			}
 			
 			view.on('text/javascript', function (request, response) { return response.OK().render(BACKBONE).commit(); });							

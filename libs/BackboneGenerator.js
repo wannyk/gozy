@@ -1,7 +1,11 @@
 var _ = require('underscore');
 
+var GOZY_RMI = exports.GOZY_RMI = 'x-gozy-rmi';
+var GOZY_DGT = exports.GOZY_DGT = 'x-gozy-dgt';
+
 var /* GLOBAL CONSTANTS */
 	TYPE = 'Type', BACKBONE_MODEL = 'model', BACKBONE_COLLECTION = 'collection',
+	AcceptRMI = 'AcceptRMI',
 	ACCEPT_URL = 'AcceptUrl',
 	/* CONSTANTS FOR MODEL */
 	MODEL_OPTIONS = 'ModelOptions',
@@ -9,6 +13,49 @@ var /* GLOBAL CONSTANTS */
 	MODEL_URL = 'ModelUrl', 
 	COLLECTION_OPTIONS = 'CollectionOptions', PARSE_OVERRIDE = 'parse';
 	
+/* RMI TEMPLATE */
+var RMITemplate = [
+	'<% for(var i=0; i<AcceptRMI.length; i++) { ',
+	'	var rmi_name = AcceptRMI[i]; %>',
+	'<%=rmi_name%>: function () {',
+	'	var params = [], cb;',
+	'	if(arguments.length === 0) {',
+	'		cb = function () { };',
+	'	} else if(typeof arguments[arguments.length - 1] === \'function\') {',
+	'		cb = arguments[arguments.length - 1];' 	,
+	'		for(var i=0; i<arguments.length - 1; i++) { ',
+	'			if(typeof arguments[i] !== \'function\')',
+	'				params.push(arguments[i]);',
+	'			else', 
+	'				throw new Error(\'An argument for Gozy RMI Request cannot be a function: at \' + i);',
+	'		}',
+	'	} else {',
+	'		cb = function () { };',
+	'		for(var i=0; i<arguments.length; i++) {',
+	'			if(typeof arguments[i] !== \'function\')',
+	'				params.push(arguments[i]);',
+	'			else', 
+	'				throw new Error(\'An argument for Gozy RMI Request cannot be a function: at \' + i);',
+	'		}',
+	'	}',
+	'',
+	'	$.ajax({',
+	'		url: \'<%=url%>\',',
+	'		type: \'POST\',',
+	'		async: true,',
+	'		accept: \'application/json\',',
+	'		contentType: \'application/json; charset=UTF-8\',',
+	'		dataType: \'json\',',
+	'		headers: { \'' + GOZY_RMI + '\': \'<%=rmi_name%>\', \'' + GOZY_DGT + '\': \'<%=method%>\' },',
+	'		data: JSON.stringify(params),',
+	'		complete: function (jqXHR, textStatus) {',
+	'			if(jqXHR.status !== 200) throw new Error(\'Returned status from Gozy RMI Request is "\' + jqXHR.statusText + \'"\');', 
+	'			cb.apply(cb, jqXHR.responseJSON);',
+	'		},',
+	'	});',
+	'}',	    		
+	'<% } %>'
+].join('\n');
 
 /* COLLECTION TEMPLATE */	 
 var RequireJSCollectionPrefix = [
@@ -34,6 +81,10 @@ var BackboneCollectionTemplate = [
 	'		url: \'<%=url%>\',',
 	'		model: Model,',
 	'		<%=CollectionOptions%>',
+	'<% if(AcceptRMI && AcceptRMI.length > 0) { %>',
+	'	,',
+	RMITemplate,
+	'<% } %>',
   	'	});'
 ].join('\n');
 
@@ -93,8 +144,11 @@ exports.generateModelContentFunction = function (accept_url, accept_method, opti
 	global.gozy.silly('Backbone Model has been generated:\n' + GeneratedTemplate);
 	
 	GeneratedTemplate = new Buffer(GeneratedTemplate);
-	return function () {
-		return GeneratedTemplate;
+	return {
+		accept_rmi: [],
+		content_func: function () {
+			return GeneratedTemplate;
+		}
 	};
 };
 
@@ -107,17 +161,25 @@ exports.generateCollectionContentFunction = function (accept_url, accept_method,
 	global.gozy.silly('Backbone Collection generation for ' + accept_method + ' ' + accept_url);
 	console.log(options);
 	
-	var CollectionOptions = options[COLLECTION_OPTIONS];
+	var CollectionOptions = options[COLLECTION_OPTIONS],
+		accept_rmi = [];
 	
 	if(CollectionOptions) {
+		if(CollectionOptions[AcceptRMI]) {
+			accept_rmi = CollectionOptions[AcceptRMI];
+			delete CollectionOptions[AcceptRMI];
+		}
+		
 		var _parse_func_overrided; 
-		if(CollectionOptions[PARSE_OVERRIDE]) _parse_func_overrided = CollectionOptions[PARSE_OVERRIDE] + '';
+		if(CollectionOptions[PARSE_OVERRIDE]) {
+			_parse_func_overrided = CollectionOptions[PARSE_OVERRIDE] + '';
+			delete CollectionOptions[PARSE_OVERRIDE];
+		}
 		
 		CollectionOptions = JSON.stringify(options.CollectionOptions);
 		CollectionOptions = CollectionOptions.substring(1, CollectionOptions.length - 1);
 		
 		if(_parse_func_overrided) CollectionOptions += (CollectionOptions ? ', parse: ' : 'parse: ') + _parse_func_overrided;
-		
 	} else CollectionOptions = '';
 	
 	var ModelOptions = options[MODEL_OPTIONS];
@@ -132,8 +194,10 @@ exports.generateCollectionContentFunction = function (accept_url, accept_method,
 	
 	var GeneratedTemplated = _.template(BackboneCollectionTemplate, {
 		url: accept_url,
+		method: accept_method,
 		ModelOptions: ModelOptions,
-		CollectionOptions: CollectionOptions
+		CollectionOptions: CollectionOptions,
+		AcceptRMI: accept_rmi
 	});
 	
 	if(options.RequireJS) 
@@ -142,8 +206,11 @@ exports.generateCollectionContentFunction = function (accept_url, accept_method,
 	global.gozy.silly('Backbone Collection has been generated:\n' + GeneratedTemplated);
 	
 	GeneratedTemplated = new Buffer(GeneratedTemplated);
-	return function () {
-		return GeneratedTemplated;
+	return {
+		accept_rmi: accept_rmi,
+		content_func: function () {
+			return GeneratedTemplated;
+		}
 	};
 };
 
