@@ -47,10 +47,10 @@ gozy.bindModels('application/model/')
 	.listen(http);
 ```
 
-Controller Usage
+View Usage
 ================
 '''
-require('gozy').Controller(this, {
+require('gozy').View(this, {
 	'accept-url': /^\/path\/to\/resource$/,
 	'accept-method': 'GET'
 });
