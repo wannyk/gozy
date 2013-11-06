@@ -1,5 +1,5 @@
 var util = require('util'),
-	Renderer = require('./Renderer').Renderer;
+	Renderer = require('./renderer').Renderer;
 
 var HTTP_STATUS = exports.HTTP_STATUS = [
 		{"code": 200, "name": "OK", "headers_required": [], "function_required": [''] },
