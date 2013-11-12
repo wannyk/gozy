@@ -143,6 +143,16 @@ HttpResponse.prototype.addCookie = function (name, value, expires, http_only, se
 	return this.appendHeader('Set-Cookie', cookie.join(';'));
 };
 
+HttpResponse.prototype.flushCookies = function () {
+	var idx = 0;
+	while(idx < this._headers.length) {
+		if(this._headers[idx][0] === 'Set-Cookie') {
+			this._headers.splice(idx, 1);
+			idx = 0;
+		}
+	}
+};
+
 HttpResponse.prototype.error = function (err) {
 	this.InternalServerError();
 	global && global.gozy && global.gozy.error && global.gozy.error(err);
