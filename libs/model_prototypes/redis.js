@@ -92,7 +92,7 @@ Redis.prototype.attachModel = function (model) {
 		break;
 	case 'SET':
 		['spop', 'scard', 'smembers'].forEach(function (cmd) {
-		model[cmd] = generate_redis_func.KEY_FUNC.call(model[name], cmd, name + '.', model[name]);
+			model[cmd] = generate_redis_func.KEY_FUNC.call(model[name], cmd, name + '.', model[name]);
 		});
 		['sadd', 'srem'].forEach(function (cmd) {
 			model[cmd] = generate_redis_func.KEY_ARG1_FUNC.call(model[name], cmd, name + '.');
@@ -121,6 +121,9 @@ Redis.prototype.attachModel = function (model) {
 		});
 		['setex'].forEach(function (cmd) {
 			model[name].prototype[cmd] = me.SELFKEY_ARG1_SETFUNC(model[name], cmd, name + '.');
+		});
+		['mget'].forEach(function (cmd) {
+			model[cmd] = me.KEYARRAY_FUNC(model[name], cmd, name + '.');
 		});
 		break;
 	
@@ -228,6 +231,27 @@ Redis.prototype.KEY_ARG1_ARG2_FUNC = function (model, func_name, name) {
 			
 			if(!isNULL(key)) return me.redis[func_name](name + key, arg1, arg2, cb);
 			else return cb(new Error('null key for ' + name));
+		} catch (e) { cb(e); }
+	};
+};
+
+Redis.prototype.KEYARRAY_FUNC = function (model, func_name, name) {
+	var me = this;
+	return function (arr, cb) {
+		try {
+			if(!cb) return cb(new Error('no callback function is defined in ' + func_name + ', ' + name));
+			
+			if(!arr) return cb(new Error('null key for ' + name));
+			if(arr.length === 0) return cb(null, []);
+			
+			return me.redis[func_name](arr, function (err, _results) {
+				if(err) return cb(err);
+				for(var i=0; i<_results.length; i++) {
+					if(typeof _results[i] === 'string')
+						_results[i] = new model(JSON.parse(_results[i]), arr[i]);
+				}
+				return cb(null, _results);					
+			});
 		} catch (e) { cb(e); }
 	};
 };
