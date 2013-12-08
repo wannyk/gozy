@@ -88,7 +88,7 @@ function parseBody(req, http_req, cb) {
 					try {
 						_body[key] = decodeURIComponent(_body[key]);
 					} catch (e) {
-						global.gozy.warning(e);
+						global.gozy.warn(e);
 						if(_body[key]) delete _body[key];
 					}
 				}
@@ -118,7 +118,7 @@ function parseBody(req, http_req, cb) {
 			}
 			
 			try {
-				var _body = JSON.parse(body.toString(charset));
+				var _body = JSON.parse(buf.toString(charset));
 				http_req._body = _body;
 				return cb(http_req);
 			} catch (err) {
