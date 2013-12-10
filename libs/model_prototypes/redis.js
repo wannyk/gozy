@@ -119,7 +119,7 @@ Redis.prototype.attachModel = function (model) {
 		['set', 'setnx'].forEach(function (cmd) {
 			model[name].prototype[cmd] = me.SELFKEY_SETFUNC(model[name], cmd, name + '.');
 		});
-		['setex'].forEach(function (cmd) {
+		['psetex', 'setex'].forEach(function (cmd) {
 			model[name].prototype[cmd] = me.SELFKEY_ARG1_SETFUNC(model[name], cmd, name + '.');
 		});
 		['mget'].forEach(function (cmd) {
