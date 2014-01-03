@@ -1,4 +1,5 @@
-var _ = require('underscore');
+var cluster = require('cluster'),
+	_ = require('underscore');
 
 var GOZY_RMI = exports.GOZY_RMI = 'x-gozy-rmi';
 var GOZY_DGT = exports.GOZY_DGT = 'x-gozy-dgt';
@@ -123,8 +124,9 @@ exports.generateModelContentFunction = function (accept_url, accept_method, opti
 	if(accept_url instanceof RegExp) accept_url = regexp2string(accept_url);
 	if(typeof options[ACCEPT_URL] == 'string') accept_url = options[ACCEPT_URL];
 	
-	global.gozy.silly('Backbone Model generation for ' + accept_method + ' ' + accept_url);
-	console.log(options);
+	if(cluster.isMaster) {
+		global.gozy.silly('Backbone Model generation for ' + accept_method + ' ' + accept_url);
+	}
 	
 	var ModelOptions = options[MODEL_OPTIONS];
 	if(ModelOptions) {
@@ -141,7 +143,9 @@ exports.generateModelContentFunction = function (accept_url, accept_method, opti
 	if(options.RequireJS) 
 		GeneratedTemplate = RequireJSModelPrefix + GeneratedTemplate + RequireJSModelSuffix;
 	
-	global.gozy.silly('Backbone Model has been generated:\n' + GeneratedTemplate);
+	if(cluster.isMaster) {
+		global.gozy.silly('Backbone Model has been generated:\n' + GeneratedTemplate);
+	}
 	
 	GeneratedTemplate = new Buffer(GeneratedTemplate);
 	return {
@@ -158,8 +162,9 @@ exports.generateCollectionContentFunction = function (accept_url, accept_method,
 	if(accept_url instanceof RegExp) accept_url = regexp2string(accept_url);
 	if(typeof options[ACCEPT_URL] == 'string') accept_url = options[ACCEPT_URL];
 	
-	global.gozy.silly('Backbone Collection generation for ' + accept_method + ' ' + accept_url);
-	console.log(options);
+	if(cluster.isMaster) {
+		global.gozy.silly('Backbone Collection generation for ' + accept_method + ' ' + accept_url);
+	}
 	
 	var CollectionOptions = options[COLLECTION_OPTIONS],
 		accept_rmi = [];
@@ -203,7 +208,9 @@ exports.generateCollectionContentFunction = function (accept_url, accept_method,
 	if(options.RequireJS) 
 		GeneratedTemplated = GeneratedRequireJSCollectionPrefix + GeneratedTemplated + RequireJSCollectionSuffix;
 		
-	global.gozy.silly('Backbone Collection has been generated:\n' + GeneratedTemplated);
+	if(cluster.isMaster) {
+		global.gozy.silly('Backbone Collection has been generated:\n' + GeneratedTemplated);
+	}
 	
 	GeneratedTemplated = new Buffer(GeneratedTemplated);
 	return {

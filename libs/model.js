@@ -1,5 +1,6 @@
 "use strict";
 
+var cluster = require('cluster');
 var utilities = require('./utilities'),
 	_ = require('underscore'),
 	async = require('async'),
@@ -30,7 +31,7 @@ exports.connectAll = function (cb) {
 	
 	for(var i=0; i<db_keys.length; i++) {
 		if(!model_pool[db_keys[i]])
-			global.gozy.warn('Database "' + db_keys[i] + '" does not have any model');		
+			if(cluster.isMaster) global.gozy.warn('Database "' + db_keys[i] + '" does not have any model');		
 		
 		conn.push(_.bind(db_pool[db_keys[i]].connect, db_pool[db_keys[i]]));
 	}
@@ -62,8 +63,9 @@ exports.Model = function (obj, dbname, opt) {
 
 exports.bind = function (model_path, obj) {
 	/* In order to 'require' all model scripts within the path */
-	var file_count = utilities.requireAllJS(model_path);	
-	global.gozy.info(file_count + ' models found');
+	var file_count = utilities.requireAllJS(model_path);
+
+	if(cluster.isMaster) global.gozy.info(file_count + ' models found');
 };
 
 _.keys(prototypes).forEach(function (model_prototype) {
