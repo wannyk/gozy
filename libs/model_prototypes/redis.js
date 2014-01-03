@@ -1,5 +1,7 @@
 "use strict";
 
+var cluster = require('cluster');
+
 var STORAGE_TYPE= 'storage_type',
 	SUPPORT_STORAGE_TYPES = ['HASH', 'STRING', 'SORTEDSET', 'SET'],
 	__primary_key__ = '___Id___',
@@ -15,7 +17,7 @@ function Redis(name, options) {
 
 Redis.prototype.connect = function (cb) {
 	if(this.host && this.port) {
-		global.gozy.info('Connecting to Redis "' + this.name + '"(' + this.host + ':' + this.port + ' ' + (this.password ? 'with password)' : 'without password)'));
+		if(cluster.isMaster) global.gozy.info('Connecting to Redis "' + this.name + '"(' + this.host + ':' + this.port + ' ' + (this.password ? 'with password)' : 'without password)'));
 		
 		this.redis = require('redis').createClient(this.port, this.host, null);
 		this.redis.on('error', function (err) {
@@ -27,15 +29,15 @@ Redis.prototype.connect = function (cb) {
 		
 		if(this.password) {
 			this.redis.auth(this.password, function(arg) {
-				global.gozy.info('Successfully connected to ' + name);
+				if(cluster.isMaster) global.gozy.info('Successfully connected to ' + name);
 				cb && cb();	
 			});	
 		} else {
-			global.gozy.info('Successfully connected to ' + name);
+			if(cluster.isMaster) global.gozy.info('Successfully connected to ' + name);
 			cb && cb();
 		}
 	} else {
-		global.gozy.error('Redis connection failed');
+		if(cluster.isMaster) global.gozy.error('Redis connection failed');
 		cb && cb();
 	}
 };

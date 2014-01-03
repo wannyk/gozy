@@ -1,6 +1,8 @@
 "use strict";
 
-var _ = require('underscore'),
+var cluster = require('cluster'),
+	http = require('http'),
+	_ = require('underscore'),
 	logger = require('./libs/logger'),
 	model = require('./libs/model'),
 	view = require('./libs/view'),
@@ -12,6 +14,7 @@ var _ = require('underscore'),
 function Gozy() {
 	this._logger = logger.defaultLogger();
 	this._websocket = false;
+	this._workers = require('os').cpus().length * 2; 
 }
 
 Gozy.prototype.logLevel = function (level) {
@@ -34,11 +37,28 @@ Gozy.prototype.bindResources = function (path, bind_url, debug) {
 	return this;
 };
 
-Gozy.prototype.listen = function (conn) {
+Gozy.prototype.setNumberOfWorkers = function (num) {
+	this._workers = num;
+	return this;
+};
+
+
+Gozy.prototype.listen = function (port) {
 	prep.call(this, _.bind(function (err) {
 		if(err) global.gozy.error(err);
-		conn.on('request', this.onRequest);
-		global.gozy.info('Gozy is opened on port ' + conn._connectionKey.split(':')[2]);
+		if (cluster.isMaster) {
+			for (var i = 0; i < this._workers; i++)
+				cluster.fork();
+			
+			cluster.on('exit', function(worker, code, signal) {
+				console.log('worker ' + worker.process.pid + ' died');
+			});
+		} else {
+			http.createServer(this.onRequest).listen(port);
+			global.gozy.info('Gozy(pid: ' + process.pid + ') is opened on port ' + port);
+		}
+		
+		
 	}, this));
 };
 

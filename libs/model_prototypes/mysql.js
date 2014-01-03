@@ -1,5 +1,6 @@
 "use strict";
 
+var cluster = require('cluster');
 var _ = require('underscore');
 
 function MySQL(name, options) {
@@ -13,7 +14,7 @@ function MySQL(name, options) {
 
 MySQL.prototype.connect = function (cb) {
 	if(this.host && this.port && this.username && this.password && this.database) {
-		global.gozy.info('Connecting to MySQL "' + this.name + '"(' + this.host + ':' + this.port + ' ' + (this.password ? 'with password)' : 'without password)'));
+		if(cluster.isMaster) global.gozy.info('Connecting to MySQL "' + this.name + '"(' + this.host + ':' + this.port + ' ' + (this.password ? 'with password)' : 'without password)'));
 		
 		this.mysql = require('mysql').createConnection({ 
 			host: this.host, 
@@ -26,11 +27,11 @@ MySQL.prototype.connect = function (cb) {
 		this.mysql.connect(_.bind(function(err) {
   			if(err) return global.gozy.error(err);
   			
-  			global.gozy.info('Successfully connected to ' + this.name);
+  			if(cluster.isMaster) global.gozy.info('Successfully connected to ' + this.name);
   			cb && cb();
   		}, this));
 	} else {
-		global.gozy.error('MySQL connection failed');
+		if(cluster.isMaster) global.gozy.error('MySQL connection failed');
 		if(cb) cb();
 	}
 };

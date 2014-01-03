@@ -1,5 +1,6 @@
 "use strict";
 
+var cluster = require('cluster');
 var _ = require('underscore'),
 	mongo = require('mongodb'),
 	ObjectID = mongo.ObjectID,
@@ -16,7 +17,7 @@ function Mongo(name, options) {
 }
 
 Mongo.prototype.connect = function (cb) {	
-	global.gozy.info('Connecting to MongoDB "' + this.name + '(' + this.host + ':' + this.port + ' ' + (this.password && this.username ? 'with password)"' : 'without password)"'));
+	if(cluster.isMaster) global.gozy.info('Connecting to MongoDB "' + this.name + '(' + this.host + ':' + this.port + ' ' + (this.password && this.username ? 'with password)"' : 'without password)"'));
 		
 	var client = new mongo.Db(this.database, new mongo.Server(this.host, this.port, {}), { safe: false });
 	client.open(_.bind(function (err, p_client) {
@@ -27,12 +28,12 @@ Mongo.prototype.connect = function (cb) {
 				if(err) return cb(err);
 				else if(!res) return cb(new Error('Mongo "' + this.name + '" authentication failed'));
 			
-				global.gozy.info('Successfully connected to ' + this.name);
+				if(cluster.isMaster) global.gozy.info('Successfully connected to ' + this.name);
 				this.client = p_client;
 				cb && cb();
 			}, this));	
 		} else {
-			global.gozy.info('Successfully connected to ' + this.name);
+			if(cluster.isMaster) global.gozy.info('Successfully connected to ' + this.name);
 			this.client = p_client;
 			cb && cb();
 		}

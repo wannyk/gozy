@@ -1,5 +1,6 @@
 "use strict";
 
+var cluster = require('cluster');
 var _ = require('underscore'),
 	fs = require('fs'),
 	mime = require('mime'),
@@ -110,7 +111,7 @@ exports.bindResources = function (resourcepath, bindurl, debug) {
 	resources = {};
 	
 	if(debug === true) {
-		global.gozy.info('Static resources will not be cached since debug mode is enabled');
+		if(cluster.isMaster) global.gozy.info('Static resources will not be cached since debug mode is enabled');
 		debug_mode = true;
 		return this;
 	}
@@ -140,7 +141,7 @@ exports.bindResources = function (resourcepath, bindurl, debug) {
 		}
 	}
 	
-	global.gozy.info(file_count + ' static resources (' +  parseInt(byte_count / 1024) + ' kB) cached');
+	if(cluster.isMaster) global.gozy.info(file_count + ' static resources (' +  parseInt(byte_count / 1024) + ' kB) cached');
 	return this;
 };
 
