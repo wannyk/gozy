@@ -1,5 +1,6 @@
 "use strict";
 
+var cluster = require('cluster');
 var _ = require('underscore'),
 	fs = require('fs'),
 	mime = require('mime'),
@@ -28,7 +29,7 @@ exports.control = function (request, response) {
 		};
 	}
 	if(!view_map) {
-		global.gozy.error('No controllers bound');
+		if(cluster.isMaster) global.gozy.error('No controllers bound');
 		return response.NotFound().commit();
 	}
 	
@@ -187,7 +188,7 @@ exports.View = function (obj, options) {
 	
 	if(!view_map[accept_url]) view_map[accept_url] = {};
 	if(view_map[accept_url][accept_method]) {
-		global.gozy.warn('Views considered as the same are exist', {
+		if(cluster.isMaster) global.gozy.warn('Views considered as the same are exist', {
 			'accept-url': options[ACCEPT_URL].toString(), 'accept-method': options[ACCEPT_METHOD]
 		});
 	}
@@ -215,7 +216,7 @@ exports.View = function (obj, options) {
 
 exports.bind = function (view_path, obj) {
 	var file_count = utilities.requireAllJS(view_path);
-	global.gozy.info(file_count + ' views found');
+	if(cluster.isMaster) global.gozy.info(file_count + ' views found');
 };
 
 function templateEnabledView(view, options) {	
