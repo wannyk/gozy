@@ -118,6 +118,9 @@ Redis.prototype.attachModel = function (model) {
 		['get'].forEach(function (cmd) {
 			model[cmd] = me.KEY_GETFUNC(model[name], cmd, name + '.');
 		});
+		['getset'].forEach(function (cmd) {
+			model[cmd] = me.KEY_ARG1_GETFUNC(model[name], cmd, name + '.');
+		});
 		['set', 'setnx'].forEach(function (cmd) {
 			model[name].prototype[cmd] = me.SELFKEY_SETFUNC(model[name], cmd, name + '.');
 		});
@@ -184,7 +187,7 @@ Redis.prototype.generateKeyFunction = function () {
 		if(val !== undefined) this[__primary_key__] = val;
 		else return this[__primary_key__];
 	};
-}
+};
 
 Redis.prototype.KEY_FUNC = function (model, func_name, name) {
 	var me = this;
@@ -196,7 +199,7 @@ Redis.prototype.KEY_FUNC = function (model, func_name, name) {
 			else return cb(new Error('null key for ' + name));
 		} catch (e) { cb(e); }
 	};
-}
+};
 
 Redis.prototype.KEY_GETFUNC = function (model, func_name, name) {
 	var me = this;
@@ -211,7 +214,23 @@ Redis.prototype.KEY_GETFUNC = function (model, func_name, name) {
 			else return cb(new Error('null key for ' + name));
 		} catch (e) { cb(e); }
 	};
-}
+};
+
+Redis.prototype.KEY_ARG1_GETFUNC = function (model, func_name, name) {
+	var me = this;
+	return function (key, arg1, cb) {
+		try {
+			if(!cb) return cb(new Error('no callback function is defined in ' + func_name + ', ' + name));
+			if(!isNULL(key)) return me.redis[func_name](name + key, arg1, function (err, result) {
+				if(err || !result) return cb(err, null);
+				if(typeof result === 'string') result = JSON.parse(result);
+				return cb(null, new model(result, key));
+			});
+			else return cb(new Error('null key for ' + name));
+		} catch (e) { cb(e); }
+	};
+};
+
 
 Redis.prototype.KEY_ARG1_FUNC = function (model, func_name, name) {
 	var me = this;
@@ -223,7 +242,7 @@ Redis.prototype.KEY_ARG1_FUNC = function (model, func_name, name) {
 			else return cb(new Error('null key for ' + name));
 		} catch (e) { cb(e); }
 	};
-}
+};
 	
 Redis.prototype.KEY_ARG1_ARG2_FUNC = function (model, func_name, name) {
 	var me = this;
@@ -289,7 +308,7 @@ Redis.prototype.SELFKEY_FUNC = function (model, func_name, name) {
 			else return cb(new Error('null key for ' + name));
 		} catch (e) { cb(e); }
 	};
-}
+};
 
 Redis.prototype.SELFKEY_ARG1_FUNC = function (model, func_name, name) {
 	var me = this;
@@ -303,7 +322,7 @@ Redis.prototype.SELFKEY_ARG1_FUNC = function (model, func_name, name) {
 			else return cb(new Error('null key for ' + name));
 		} catch (e) { cb(e); }
 	};
-}
+};
 	
 /***************** Only for String Model *****************/
 Redis.prototype.SELFKEY_SETFUNC = function (model, func_name, name, value_name, value_type) {
@@ -320,7 +339,7 @@ Redis.prototype.SELFKEY_SETFUNC = function (model, func_name, name, value_name, 
 			else throw new Error('null key for ' + name);
 		} catch (e) { cb(e); }
 	};
-}
+};
 
 Redis.prototype.SELFKEY_ARG1_SETFUNC = function (model, func_name, name, value_name, value_type) {
 	var me = this;
@@ -336,7 +355,7 @@ Redis.prototype.SELFKEY_ARG1_SETFUNC = function (model, func_name, name, value_n
 			else throw new Error('null key for ' + name);
 		} catch (e) { cb(e); }
 	};
-}
+};
 
 /***************** Only for Hash Model *****************/
 Redis.prototype.SELFKEY_HMSETFUNC = function (model, func_name, name, def) {
