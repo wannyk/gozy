@@ -122,7 +122,7 @@ Redis.prototype.attachModel = function (model) {
 		if(!self.subscription_redis) return global.gozy.error('Trying to unsubscribe "subscription" disabled redis model "' + name + '." Try to use "enableSubscription: true"');
 		self.subscription_redis.unsubscribe(name + '.CHANNEL.' + channel);
 		if(typeof idx == 'number' && idx >= 0) {
-			self.subscription_redis.removeListener('message', subscription_map[idx]);
+			if(subscription_map[idx]) self.subscription_redis.removeListener('message', subscription_map[idx]);
 			delete subscription_map[idx];
 		}
 	};
