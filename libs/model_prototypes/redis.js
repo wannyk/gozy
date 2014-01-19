@@ -52,7 +52,7 @@ Redis.prototype.clone = function (cb) {
 	
 	_new.redis = redis.createClient(_new.port, _new.host, null);
 	_new.redis.on('error', function (err) {
-		return cb(err);
+		global.gozy.error(err);
 	});
 	
 	if(_new.password) {
