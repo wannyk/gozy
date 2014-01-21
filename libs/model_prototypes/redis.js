@@ -111,7 +111,8 @@ Redis.prototype.attachModel = function (model) {
 			if(c == (name + '.CHANNEL.' + channel)) return cb(channel, m);
 		};
 		
-		subscription_map[subscription_map_idx] = func; 
+		subscription_map[subscription_map_idx] = func;
+		
 		self.subscription_redis.subscribe(name + '.CHANNEL.' + channel);
 		self.subscription_redis.on('message', func);
 		
