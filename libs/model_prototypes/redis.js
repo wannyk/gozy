@@ -1,6 +1,7 @@
 "use strict";
 
-var cluster = require('cluster');
+var cluster = require('cluster'),
+	redis = require('redis');
 
 var STORAGE_TYPE= 'storage_type',
 	SUPPORT_STORAGE_TYPES = ['HASH', 'STRING', 'SORTEDSET', 'SET'],
@@ -19,7 +20,7 @@ Redis.prototype.connect = function (cb) {
 	if(this.host && this.port) {
 		if(cluster.isMaster) global.gozy.info('Connecting to Redis "' + this.name + '"(' + this.host + ':' + this.port + ' ' + (this.password ? 'with password)' : 'without password)'));
 		
-		this.redis = require('redis').createClient(this.port, this.host, null);
+		this.redis = redis.createClient(this.port, this.host, null);
 		this.redis.on('error', function (err) {
 			global.gozy.error(err);
 			cb && cb();
@@ -42,13 +43,43 @@ Redis.prototype.connect = function (cb) {
 	}
 };
 
+Redis.prototype.clone = function (cb) {
+	var _new = new Redis(this.name, {
+		host: this.host, 
+		port: this.port, 
+		password: this.password 	
+	});
+	
+	_new.redis = redis.createClient(_new.port, _new.host, null);
+	_new.redis.on('error', function (err) {
+		global.gozy.error(err);
+	});
+	
+	if(_new.password) {
+		_new.redis.auth(_new.password, function(arg) {
+			return cb(null, _new);	
+		});	
+	} else {
+		return cb(null, _new);
+	}
+};
+
 Redis.prototype.attachModel = function (model) {
 	var type = model._opt.type,
 		defaults = model._opt.defaults,
-		name = model._filename;
-	if(!type) return global.gozy.error('Model for Redis, "' + name + '", does not specify data type');
-	if(!defaults) global.gozy.warn('Model for Redis, "' + name + '", does not have default values');
-	if(!name) return global.gozy.error('illegal `require` for the redis model');
+		name = model._filename,
+		self = this;
+	if(!type && cluster.isMaster) return global.gozy.error('Model for Redis, "' + name + '", does not specify data type');
+	if(!defaults && cluster.isMaster) global.gozy.warn('Model for Redis, "' + name + '", does not have default values');
+	if(!name && cluster.isMaster) return global.gozy.error('illegal `require` for the redis model');
+	if(model._opt.enableSubscription) {
+		if(cluster.isMaster) global.gozy.info(this.name + '\'s model ' + name + ' has enabled subscription mode');
+		this.clone(function (err, subinst) {
+			if(err && cluster.isMaster) return global.gozy.error(err);
+			self.subscription_redis = subinst.redis;
+			self.subscription_redis.setMaxListeners(0);
+		});
+	}
 	
 	model[name] = this.generateModel(name, defaults);
 	model[name].prototype.key = this.generateKeyFunction();
@@ -65,9 +96,37 @@ Redis.prototype.attachModel = function (model) {
 		model[cmd] = me.KEY_ARG1_FUNC(model[name], cmd, name + '.');
 	});
 	
-	['publish'].forEach(function (cmd) {
-		model[cmd] = me.RAW_FUNC(model[name], cmd);
-	});
+	
+	var subscription_map = {},
+		subscription_map_idx = 0;
+	
+	model.publish = function (channel, message) {
+		self.redis.publish(name + '.CHANNEL.' + channel, message);
+	};
+	
+	model.subscribe = function (channel, cb) {
+		if(!self.subscription_redis) return global.gozy.error('Trying to subscribe "subscription" disabled redis model "' + name + '." Try to use "enableSubscription: true"');
+		
+		var func = function (c, m) {
+			if(c == (name + '.CHANNEL.' + channel)) return cb(channel, m);
+		};
+		
+		subscription_map[subscription_map_idx] = func;
+		
+		self.subscription_redis.subscribe(name + '.CHANNEL.' + channel);
+		self.subscription_redis.on('message', func);
+		
+		return subscription_map_idx++;
+	};
+	
+	model.unsubscribe = function (channel, idx) {
+		if(!self.subscription_redis) return global.gozy.error('Trying to unsubscribe "subscription" disabled redis model "' + name + '." Try to use "enableSubscription: true"');
+		self.subscription_redis.unsubscribe(name + '.CHANNEL.' + channel);
+		if(typeof idx == 'number' && idx >= 0) {
+			if(subscription_map[idx]) self.subscription_redis.removeListener('message', subscription_map[idx]);
+			delete subscription_map[idx];
+		}
+	};
 
 	['del', 'ttl', 'pttl'].forEach(function (cmd) {
 		model[name].prototype[cmd] = me.SELFKEY_FUNC(model[name], cmd, name + '.');
@@ -117,6 +176,9 @@ Redis.prototype.attachModel = function (model) {
 	case 'STRING':
 		['get'].forEach(function (cmd) {
 			model[cmd] = me.KEY_GETFUNC(model[name], cmd, name + '.');
+		});
+		['getset'].forEach(function (cmd) {
+			model[cmd] = me.KEY_ARG1_GETFUNC(model[name], cmd, name + '.');
 		});
 		['set', 'setnx'].forEach(function (cmd) {
 			model[name].prototype[cmd] = me.SELFKEY_SETFUNC(model[name], cmd, name + '.');
@@ -184,7 +246,7 @@ Redis.prototype.generateKeyFunction = function () {
 		if(val !== undefined) this[__primary_key__] = val;
 		else return this[__primary_key__];
 	};
-}
+};
 
 Redis.prototype.KEY_FUNC = function (model, func_name, name) {
 	var me = this;
@@ -196,7 +258,7 @@ Redis.prototype.KEY_FUNC = function (model, func_name, name) {
 			else return cb(new Error('null key for ' + name));
 		} catch (e) { cb(e); }
 	};
-}
+};
 
 Redis.prototype.KEY_GETFUNC = function (model, func_name, name) {
 	var me = this;
@@ -211,7 +273,23 @@ Redis.prototype.KEY_GETFUNC = function (model, func_name, name) {
 			else return cb(new Error('null key for ' + name));
 		} catch (e) { cb(e); }
 	};
-}
+};
+
+Redis.prototype.KEY_ARG1_GETFUNC = function (model, func_name, name) {
+	var me = this;
+	return function (key, arg1, cb) {
+		try {
+			if(!cb) return cb(new Error('no callback function is defined in ' + func_name + ', ' + name));
+			if(!isNULL(key)) return me.redis[func_name](name + key, arg1, function (err, result) {
+				if(err || !result) return cb(err, null);
+				if(typeof result === 'string') result = JSON.parse(result);
+				return cb(null, new model(result, key));
+			});
+			else return cb(new Error('null key for ' + name));
+		} catch (e) { cb(e); }
+	};
+};
+
 
 Redis.prototype.KEY_ARG1_FUNC = function (model, func_name, name) {
 	var me = this;
@@ -223,7 +301,7 @@ Redis.prototype.KEY_ARG1_FUNC = function (model, func_name, name) {
 			else return cb(new Error('null key for ' + name));
 		} catch (e) { cb(e); }
 	};
-}
+};
 	
 Redis.prototype.KEY_ARG1_ARG2_FUNC = function (model, func_name, name) {
 	var me = this;
@@ -261,6 +339,7 @@ Redis.prototype.KEYARRAY_FUNC = function (model, func_name, name) {
 Redis.prototype.RAW_FUNC = function (model, func_name) {
 	var me = this;
 	return function () {
+		console.log(arguments);
 		return me.redis[func_name].apply(me.redis, arguments);
 	};
 };
@@ -289,7 +368,7 @@ Redis.prototype.SELFKEY_FUNC = function (model, func_name, name) {
 			else return cb(new Error('null key for ' + name));
 		} catch (e) { cb(e); }
 	};
-}
+};
 
 Redis.prototype.SELFKEY_ARG1_FUNC = function (model, func_name, name) {
 	var me = this;
@@ -303,7 +382,7 @@ Redis.prototype.SELFKEY_ARG1_FUNC = function (model, func_name, name) {
 			else return cb(new Error('null key for ' + name));
 		} catch (e) { cb(e); }
 	};
-}
+};
 	
 /***************** Only for String Model *****************/
 Redis.prototype.SELFKEY_SETFUNC = function (model, func_name, name, value_name, value_type) {
@@ -320,7 +399,7 @@ Redis.prototype.SELFKEY_SETFUNC = function (model, func_name, name, value_name, 
 			else throw new Error('null key for ' + name);
 		} catch (e) { cb(e); }
 	};
-}
+};
 
 Redis.prototype.SELFKEY_ARG1_SETFUNC = function (model, func_name, name, value_name, value_type) {
 	var me = this;
@@ -336,7 +415,7 @@ Redis.prototype.SELFKEY_ARG1_SETFUNC = function (model, func_name, name, value_n
 			else throw new Error('null key for ' + name);
 		} catch (e) { cb(e); }
 	};
-}
+};
 
 /***************** Only for Hash Model *****************/
 Redis.prototype.SELFKEY_HMSETFUNC = function (model, func_name, name, def) {
@@ -369,7 +448,7 @@ Redis.prototype.SELFKEY_HMSETFUNC = function (model, func_name, name, def) {
 };
 
 function isNULL(val) {
-	return val === undefined || val === '' || val === null;
+	return val === undefined || val === null;
 }
 
 module.exports = Redis;

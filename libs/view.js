@@ -40,8 +40,8 @@ exports.control = function (request, response) {
 			return response.LengthRequired().commit();
 		if(content_length > 0 && !request.body()) {
 			return response.NotAcceptable()
-						.appendHeader('accept_encoding', ['application/json', 'application/x-www-urlencoded', 'multipart/form-data'].join(','))
-						.appendHeader('accept_charset', ['UTF-8'].join(','))
+						.appendHeader('Accept-Encoding', ['application/json', 'application/x-www-urlencoded', 'multipart/form-data'].join(','))
+						.appendHeader('Accept-Charset', ['UTF-8'].join(','))
 						.commit();
 		}
 	} else if(request.isBackboneRequest()) {

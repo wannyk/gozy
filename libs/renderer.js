@@ -131,7 +131,7 @@ exports.bindResources = function (resourcepath, bindurl, debug) {
 		} else if(stat.isFile()) {
 			var name = path.substring(resource_path.length, path.length);
 			
-			file = readFile(path);
+			var file = readFile(path);
 			if(!file) continue;
 
 			resources[resource_url + name] = file;

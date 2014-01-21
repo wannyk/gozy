@@ -14,7 +14,7 @@ var cluster = require('cluster'),
 function Gozy() {
 	this._logger = logger.defaultLogger();
 	this._websocket = false;
-	this._workers = require('os').cpus().length * 2; 
+	this._workers = require('os').cpus().length; 
 }
 
 Gozy.prototype.logLevel = function (level) {
